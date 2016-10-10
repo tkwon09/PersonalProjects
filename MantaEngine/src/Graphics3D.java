@@ -4,8 +4,11 @@ import java.awt.Point;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.TreeSet;
-
+import java.util.concurrent.Semaphore;
+import java.lang.System;
 import javax.swing.JFrame;
+
+import com.sun.org.apache.xml.internal.resolver.helpers.Debug;
 
 public class Graphics3D {
 
@@ -22,7 +25,7 @@ public class Graphics3D {
 	// and does not pan, rotate, or change its viewing direction;
 	// @params Graphics
 	// @returns Graphics
-	public Graphics render(Graphics graphics, String RENDER_MODE) {
+	public Graphics render(Graphics graphics, String RENDER_MODE, double specularHardness, double specularIntensity, Semaphore lockLights, Semaphore lockObjects) throws InterruptedException {
 
 		// create an ArrayList to store all Triangle3D in the world
 		ArrayList<Triangle3D> AllTriangles = new ArrayList<Triangle3D>();
@@ -36,6 +39,10 @@ public class Graphics3D {
 		}
 
 		ArrayList<Object> objects = new ArrayList<Object>();
+
+		do
+		{
+		}while (!lockObjects.tryAcquire());
 		for (int i = 0; i < game.world().objects().size(); i++) {
 			// remove all objects not in front of camera;
 			Object curr = game.world().objects().get(i);
@@ -79,6 +86,7 @@ public class Graphics3D {
 				}
 			}
 		}
+		lockObjects.release();
 
 		// sorts all of the Triangle3D by depth in increasing order;
 		depthSort(AllTriangles);
@@ -92,7 +100,7 @@ public class Graphics3D {
 		}
 
 		// set Vertex colors based on light sources in the scene;
-		computeVertexColors(AllVertices);
+		computeVertexColors(AllVertices, specularHardness, specularIntensity, lockLights);
 
 		// modifies a Vertex array of vertices into one projected into
 		// 2D space; they are not yet in screen space;
@@ -168,8 +176,7 @@ public class Graphics3D {
 
 		// compute the see which way the face is facing in comparison
 		// to the camera (located at 0,0,0)
-		Vector3D cvector = new Vector3D(new Vertex(0, 0, (float) game.world()
-				.camera().position().z()), t.getVertex(0));
+		Vector3D cvector = new Vector3D(new Vertex(0, 0, (float) game.world().camera().position().z()), t.getVertex(0));
 		double angle = tnormal.dotProduct(cvector);
 
 		if (angle > 0)
@@ -238,106 +245,112 @@ public class Graphics3D {
 		}
 	}
 
-	private void computeVertexColors(ArrayList<Vertex> vertices) {
+	private void computeVertexColors(ArrayList<Vertex> vertices, double specularHardness, double specularIntensity, Semaphore lockLights) throws InterruptedException {
 		ArrayList<Light> lights = game.world().lights();
-		int vnindex = 0;
 		for (Vertex v : vertices) {
 
-			double red = v.color().getRed();
-			double green = v.color().getGreen();
-			double blue = v.color().getBlue();
-
-			Vector3D vnormal = v.normal();
+			double v_red = v.color().getRed() / 255.0;
+			double v_green = v.color().getGreen() / 255.0;
+			double v_blue = v.color().getBlue() / 255.0;
 			
-			for (Light light : lights) {
-				Vector3D lvector = new Vector3D(v, light.position());
-				Color lcolor = light.color();
-				
-				// My own method of shading, which is probably just
-				// pseudo-shading. Looks nice in most situations, though.
-				double angle = Vector3D.angleBetweenVectors(vnormal, lvector);
-				
-				double brightness = 1 - (angle / Math.PI);
-				double luminosity = light.strength() / lvector.magnitude();
-				double anglediff = 1 - (angle * (2 / Math.PI));
-
-				red = luminosity * (brightness * red + anglediff * lcolor.getRed());
-				green = luminosity * (brightness * green + anglediff * lcolor.getGreen());
-				blue = luminosity * (brightness * blue + anglediff * lcolor.getBlue());
-				/*
-				// SHADING ALGORITHM
+			double red_total = 0;
+			double green_total = 0;
+			double blue_total = 0;
+			
+			do
+			{
+			}while (!lockLights.tryAcquire());
+			for (int i = 0; i < lights.size(); i++)
+			{
+				Light l = lights.get(i);
 				
 				// AMBIENT LIGHTING
-				float AmbAmount = game.world().ambient();
+				double a_red = game.world().ambient() * v_red * l.color().getRed() / 255.0;
+				double a_green = game.world().ambient() * v_green * l.color().getGreen() / 255.0;
+				double a_blue = game.world().ambient() * v_blue * l.color().getBlue() / 255.0;
 				
 				// DIFFUSE LIGHTING
-				Vector3D VectorToLight = lvector.normal();
-			    double DiffuseFactor = Vector3D.dotProduct(VectorToLight, vnormal); //DiffuseFactor ranges from 0 to 1
-			    if(DiffuseFactor < 0)
-			    	DiffuseFactor = 0; //Surfaces more than 90 degrees are in total shadow 
-				
+				Vector3D vertexToLight = new Vector3D(v, l.position()).normal();
+			    double diffuseFactor = Vector3D.dotProduct(v.normal(), vertexToLight); //DiffuseFactor ranges from 0 to 1
+			    if (diffuseFactor < 0)
+			    	diffuseFactor = 0; //Surfaces more than 90 degrees are in total shadow 
+			    
+			    double d_red = l.color().getRed() / 255.0 * v_red * diffuseFactor;
+			    double d_green = l.color().getGreen() / 255.0 * v_green * diffuseFactor;
+			    double d_blue = l.color().getBlue() / 255.0 * v_blue * diffuseFactor;
+			    
 				// SPECULAR LIGHTING
-				Vector3D DirectionToViewer = new Vector3D(v, game.world().camera().position());
-				DirectionToViewer.normalize();
-				DirectionToViewer.set(3, 0);
+			    double s_red = 0;
+			    double s_green = 0;
+			    double s_blue = 0;
+			    if (diffuseFactor > 0)
+			    {
+			    	try
+			    	{
+				    	Vector3D vertexToCamera = new Vector3D(v, game.world().camera().position()).normal();
+				    	Vector3D lightToVertex = Vector3D.scale(vertexToLight, -1, -1, -1);
+			    		Vector3D reflect = Matrix.mult(lightToVertex, Matrix.reflectMatrix(v.normal().get(0), v.normal().get(1), v.normal().get(2)));
+				    	double specularFactor = Vector3D.dotProduct(vertexToCamera, reflect);
+				    	if(specularFactor < 0)
+				    		specularFactor = 0;
+				    	specularFactor = Math.pow(specularFactor, specularHardness);
+				    	
+					    s_red = l.color().getRed() / 255.0 * specularIntensity * specularFactor;
+					    s_green = l.color().getGreen() / 255.0 * specularIntensity * specularFactor;
+					    s_blue = l.color().getBlue() / 255.0 * specularIntensity * specularFactor;
+			    	}
+			    	catch(IOException exception)
+			    	{
+			    	}
+			    }
 			    
-			    double scale = 2 * Vector3D.dotProduct(vnormal, VectorToLight);
-			    Vector3D scalednormal = Vector3D.scale(vnormal, scale, scale, scale);
-			    scalednormal.set(3, 0);
+			    // ATTENUATION
+		        double distanceToLight = new Vector3D(v, l.position()).magnitude();
+		        double attenuationFactor = 1.0 / (1.0 + (distanceToLight / 255) * (distanceToLight / 255));
 			    
-			    Vector3D ReflectanceRay = null;
-			    Matrix diff = null;
-				try {
-				diff = scalednormal.components().subtract(VectorToLight.components());
-				} catch (IOException e) {e.printStackTrace();}
-				
-				ReflectanceRay = new Vector3D(diff);
-				ReflectanceRay.set(3, 0);
-			    
-			    //Calc specular factor. In mathematical terms: SpecFac = (R dot N)^Spec
-			    double SpecularFactor = Math.pow(Vector3D.dotProduct(ReflectanceRay, DirectionToViewer), 1); 
-			    
+			    /*
 			    // FRESNEL EFFECT
 			    
 			    // Calc fresnel factor. We must first find the dot product of the surface
 			    // normal and the vector from the camera. This ranges from [-1..1] 
 			    // so we shift it up to [0..2] by adding one, before raising it to the power of FresAmount.
-			    double FresAmount = 1;
-			    double FresnelTerm = Math.pow(Vector3D.dotProduct(vnormal, DirectionToViewer)+1, FresAmount);
+			    double fresnelTerm = Math.pow(Vector3D.dotProduct(vnormal, directionToViewer) + 1, 1);
 			    
-			    if (FresnelTerm > 1)
-			    	FresnelTerm = 1;  //Ensure that the factor stays within the limits.
+			    if (fresnelTerm > 1)
+			    	fresnelTerm = 1;  //Ensure that the factor stays within the limits.
 			    
 			    //All the non-reflective terms: Ambient light, Diffuse Light and Specular Light
-			    double NonReflectiveRed = red*AmbAmount + red*DiffuseFactor*lcolor.getRed() + lcolor.getRed()*SpecularFactor;
-			    double NonReflectiveGreen = green*AmbAmount + green*DiffuseFactor*lcolor.getGreen() + lcolor.getGreen()*SpecularFactor;
-			    double NonReflectiveBlue = blue*AmbAmount + blue*DiffuseFactor*lcolor.getBlue() + lcolor.getBlue()*SpecularFactor;
+			    double nonReflectiveRed = red*ambAmount + red*diffuseFactor*lcolor.getRed() + lcolor.getRed()*specularFactor;
+			    double nonReflectiveGreen = green*ambAmount + green*diffuseFactor*lcolor.getGreen() + lcolor.getGreen()*specularFactor;
+			    double nonReflectiveBlue = blue*ambAmount + blue*diffuseFactor*lcolor.getBlue() + lcolor.getBlue()*specularFactor;
 
 			    //Just one reflective term. Here you would normally put the reflectivity or environment maps.
 			    double FresCol = 255;
 
 			    //We combine the reflective and non-reflective terms using the fresnel factor.    
-			    red = NonReflectiveRed;//*(1-FresnelTerm) + FresCol*FresnelTerm; 
-			    green = NonReflectiveGreen;//*(1-FresnelTerm) + FresCol*FresnelTerm;
-			    blue = NonReflectiveBlue;//*(1-FresnelTerm) + FresCol*FresnelTerm;
+			    red = nonReflectiveRed;//*(1-FresnelTerm) + FresCol*FresnelTerm; 
+			    green = nonReflectiveGreen;//*(1-FresnelTerm) + FresCol*FresnelTerm;
+			    blue = nonReflectiveBlue;//*(1-FresnelTerm) + FresCol*FresnelTerm;
 			    */
-				// clip colors;
-				if (red > 255)
-					red = 255;
-				else if (red < 0)
-					red = 0;
-				if (green > 255)
-					green = 255;
-				else if (green < 0)
-					green = 0;
-				if (blue > 255)
-					blue = 255;
-				else if (blue < 0)
-					blue = 0;
-
-				v.setColor(new Color((int) red, (int) green, (int) blue));
-				vnindex++;
+		        
+			    red_total += a_red + attenuationFactor * (d_red + s_red);
+			    green_total += a_green + attenuationFactor * (d_green + s_green);
+			    blue_total += a_blue + attenuationFactor * (d_blue + s_blue);
 			}
+			
+			// clip colors;
+			if (red_total > 1)
+				red_total = 1;
+			if (green_total > 1)
+				green_total = 1;
+			if (blue_total > 1)
+				blue_total = 1;
+			
+			v.setColor(new Color(
+					(int) (red_total * 255),
+					(int) (green_total * 255),
+					(int) (blue_total * 255)));
+			lockLights.release();
 		}
 	}
 }

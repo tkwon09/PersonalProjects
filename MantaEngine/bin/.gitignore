@@ -1,0 +1,17 @@
+/.DS_Store
+/._.DS_Store
+/Camera.class
+/Game.class
+/GouraudShader.class
+/Graphics2D.class
+/Graphics3D.class
+/ImageContainer.class
+/Light.class
+/MantaEngine.class
+/Matrix.class
+/Object.class
+/ScanLine.class
+/Triangle3D.class
+/Vector3D.class
+/Vertex.class
+/World.class

@@ -8,7 +8,7 @@ public class GouraudShader {
 	public GouraudShader(){
 	}
 	
-	public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFrame frame){
+public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFrame frame){
 		
 		// pick the highest vertex out of the three and then wind the
 		// points counter clockwise;
@@ -163,4 +163,169 @@ public class GouraudShader {
 			Rcolor = new Color(Rcolorvalues[0], Rcolorvalues[1], Rcolorvalues[2]);
 		}
 	}
+	
+	/*public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFrame frame){
+		
+		// pick the highest vertex out of the three and then wind the
+		// points counter clockwise;
+		Vertex A;
+		Vertex B;
+		Vertex C;
+		
+		if (v1.y() > v2.y())
+		{
+			if (v1.y() > v3.y())
+			{
+				if (v2.y() > v3.y())
+				{
+					A = v1;
+					B = v2;
+					C = v3;
+				}
+				else
+				{
+					A = v1;
+					B = v3;
+					C = v2;
+				}
+			}
+			else
+			{
+				A = v3;
+				B = v1;
+				C = v2;
+			}
+		}
+		else
+		{
+			if (v1.y() > v3.y())
+			{
+				A = v2;
+				B = v1;
+				C = v3;
+			}
+			else
+			{
+				if (v2.y() > v3.y())
+				{
+					A = v2;
+					B = v3;
+					C = v1;
+				}
+				else
+				{
+					A = v3;
+					B = v2;
+					C = v1;
+				}
+			}
+		}
+		// If A.y == B.y and A.x > B.x, swap A and B
+		if (A.y() == B.y() && A.x() > B.x())
+		{
+			Vertex B_t = B;
+			B = A;
+			A = B_t;
+		}
+		// If B.x < C.x, go A->B, A->C. otherwise A->C, A->B
+		ScanLine line1 = new ScanLine(A, B);
+		ScanLine line2 = new ScanLine(A, C);
+		if (B.x() > C.x())
+		{
+			ScanLine temp = line1;
+			line1 = line2;
+			line2 = temp;
+		}
+		
+		// initialize the x values of both the left and right lines and color value
+		int xL = (int)line1.v1().x();
+		int xR = (int)line2.v1().x();
+		float[] Lcolor = line1.getStartColorValues();
+		float[] Rcolor = line2.getStartColorValues();
+		float[] incolor;
+		
+		// scanning loop
+		for (int y = (int)line1.v1().y(); y >= line1.v2().y(); y--)
+		{
+			// if the end of line 1 is reached before the end of line 2,
+			// set line 1 to B -> C
+			if (y == line1.v2().y() && y >= line2.v2().y())
+			{
+				line1 = new ScanLine(B, C);
+				Lcolor = line1.getStartColorValues();
+			}
+			// if the end of line 2 is reached before the end of line 2,
+			// set line 1 to B -> C
+			if (y == line2.v2().y() && y >= line1.v2().y())
+			{
+				line2 = new ScanLine(B, C);
+				Rcolor = line2.getStartColorValues();
+			}
+			
+			incolor = new float[]{Lcolor[0], Lcolor[1], Lcolor[2]};
+			float[] incolordiff;
+			if ((xR - xL) == 0)
+			{
+				incolordiff = new float[]{Rcolor[0], Rcolor[1], Rcolor[2]};
+			}
+			else
+			{
+				incolordiff = new float[]{
+						(Rcolor[0] - Lcolor[0]) / (xR - xL),
+						(Rcolor[1] - Lcolor[1]) / (xR - xL),
+						(Rcolor[2] - Lcolor[2]) / (xR - xL)
+								};
+			}
+			
+			// loop through each point between the lines;
+			for(int x = xL; x < xR; x++){
+				incolor[0] = incolor[0] + incolordiff[0];
+				incolor[1] = incolor[1] + incolordiff[1];
+				incolor[2] = incolor[2] + incolordiff[2];
+				
+				if (incolor[0] < 0)
+				{
+					incolor[0] = 0;
+				}
+				if (incolor[0] > 1)
+				{
+					incolor[0] = 1;
+				}
+				if (incolor[1] < 0)
+				{
+					incolor[1] = 0;
+				}
+				if (incolor[1] > 1)
+				{
+					incolor[1] = 1;
+				}
+				if (incolor[2] < 0)
+				{
+					incolor[2] = 0;
+				}
+				if (incolor[2] > 1)
+				{
+					incolor[2] = 1;
+				}
+				
+				graphics.setColor(new Color(incolor[0], incolor[1], incolor[2]));
+				int sx = x + frame.getWidth() >> 1;
+				int sy = (frame.getHeight() >> 1) - y;
+				graphics.drawLine(sx, sy, sx, sy);
+			}
+			
+			// increment the left x and right x;
+			xL = (int) (xL + line1.inverseSlope());
+			xR = (int) (xR + line2.inverseSlope());
+			
+			// increment the left color and right color
+			Lcolor[0] = Lcolor[0] + line1.colorIncrement()[0];
+			Lcolor[1] = Lcolor[1] + line1.colorIncrement()[1];
+			Lcolor[2] = Lcolor[2] + line1.colorIncrement()[2];
+			
+			Rcolor[0] = Rcolor[0] + line2.colorIncrement()[0];
+			Rcolor[1] = Rcolor[1] + line2.colorIncrement()[1];
+			Rcolor[2] = Rcolor[2] + line2.colorIncrement()[2];
+		}
+	}*/
 }

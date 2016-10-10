@@ -5,17 +5,14 @@ public class Light {
 	
 	private Vertex position;
 	private Color color;
-	private int strength;
 	private World world;
 	
-	public Light(Vertex position, Color color, int strength){
+	public Light(Vertex position, Color color){
 		this.position = position;
-		this.strength = strength;
 		this.color = color;
 	}
 	
 	public Vertex position(){return this.position;}
-	public int strength(){return this.strength;}
 	public Color color(){return this.color;}
 	public World world(){return this.world;}
 	

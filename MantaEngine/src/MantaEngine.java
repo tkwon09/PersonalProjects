@@ -27,7 +27,6 @@ public class MantaEngine {
 	public void initialize(){
 		frame = new JFrame("MantaEngine");
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.setBackground(Color.BLACK);
 		frame.setUndecorated(false);
 		frame.setIconImage(Toolkit.getDefaultToolkit().getImage("resources/icon.png"));
 		frame.setSize(800, 600);
@@ -44,10 +43,15 @@ public class MantaEngine {
 		while(game.IS_RUNNING){
 			try {Thread.sleep(delay);} catch (InterruptedException e) {e.printStackTrace();}
 			game.updateLogic();
-			updateFrame();
+			try {
+				updateFrame();
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 	}
-	public void updateFrame(){
+	public void updateFrame() throws InterruptedException{
 		Graphics graphics = bufferStrategy.getDrawGraphics();
 		graphics.clearRect(0, 0, frame.getWidth(), frame.getHeight());
 		graphics = game.render(graphics);

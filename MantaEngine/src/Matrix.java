@@ -272,6 +272,22 @@ public class Matrix {
 		return trans;
 	}
 	
+	// REFLECTING MATRIX
+	public static Matrix reflectMatrix(double a, double b, double c)
+	{
+		Matrix reflect = new Matrix(4);
+		reflect.setCell(0, 0, (float)(1-2*a*a));
+		reflect.setCell(0, 1, (float)(-2*a*b));
+		reflect.setCell(0, 2, (float)(-2*a*c));
+		reflect.setCell(1, 0, (float)(-2*a*b));
+		reflect.setCell(1, 1, (float)(1-2*b*b));
+		reflect.setCell(1, 2, (float)(-2*b*c));
+		reflect.setCell(2, 0, (float)(-2*a*c));
+		reflect.setCell(2, 1, (float)(-2*b*c));
+		reflect.setCell(2, 2, (float)(1-2*c*c));
+		return reflect;
+	}
+	
 	// ROTATION MATRICES
 	public static Matrix XrotMatrix(double angle){
 		Matrix xrot = new Matrix(4);
