@@ -1,14 +1,18 @@
 import java.awt.Color;
 import java.awt.Graphics;
+import java.util.ArrayList;
+import java.util.Comparator;
 
 import javax.swing.JFrame;
+
+
 
 public class GouraudShader {
 	
 	public GouraudShader(){
 	}
 	
-public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFrame frame){
+	public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFrame frame){
 		
 		// pick the highest vertex out of the three and then wind the
 		// points counter clockwise;
@@ -16,11 +20,11 @@ public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFr
 		Vertex B;
 		Vertex C;
 		
-		if(v1.y()>=v2.y() && v1.y()>v3.y()){
+		if (v1.y() >= v2.y() && v1.y() > v3.y()){
 			A = v1;
 			B = v2;
 			C = v3;
-		} else if(v2.y()>=v1.y() && v2.y()>v3.y()){
+		} else if (v2.y() >= v1.y() && v2.y() > v3.y()){
 			A = v2;
 			B = v3;
 			C = v1;
@@ -42,17 +46,17 @@ public static void shade(Vertex v1, Vertex v2, Vertex v3, Graphics graphics, JFr
 		Color incolor = Lcolor;
 		
 		// scanning loop
-		for(int y=(int)line1.v1().y(); y>=line1.v2().y(); y--){
+		for(int y = (int)line1.v1().y(); y >= line1.v2().y(); y--){
 			
 			// if the end of line 1 is reached before the end of line 2
 			// is reached, then line 1 is now from B to C;
-			if(y==line1.v2().y() && y>=line2.v2().y()){
+			if (y <= line1.v2().y() && y >= line2.v2().y()){
 				line1 = new ScanLine(B, C);
 				Lcolor = B.color();
 			
-				// if the end of line 2 is reached before the end of line 1
-				// is reached, then line 2 is now from C to B;
-			} else if(y<line2.v2().y()){
+			// if the end of line 2 is reached before the end of line 1
+			// is reached, then line 2 is now from C to B;
+			} else if (y < line2.v2().y()){
 				line2 = new ScanLine(C, B);
 				Rcolor = C.color();
 			}

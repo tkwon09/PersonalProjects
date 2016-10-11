@@ -94,6 +94,7 @@ public class Game implements KeyListener{
 		objects.add(Object.object(teapot, "C", Color.MAGENTA));
 		objects.add(Object.object(magnolia, "CC", null));
 		objects.add(Object.star(50, Color.YELLOW));
+		objects.add(Object.plane(200, 200, 30, 30, Color.WHITE));
 		world.addLight(light1);
 		world.addObject(objects.get(0), new Vertex(0,0,-300), new Vector3D(0,0,0));
 		

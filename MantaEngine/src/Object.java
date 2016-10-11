@@ -291,31 +291,52 @@ public class Object {
 		
 		return new Object(t);
 	}
-	/*
-	public static plane(int height, int width, int heightdivision, int widthdivision, Color color){
+	
+	public static Object plane(int height, int width, int heightdivision, int widthdivision, Color color){
 		Vertex[] v = new Vertex[(heightdivision+1)*(widthdivision+1)];
 		Triangle3D[] t = new Triangle3D[2*(heightdivision*widthdivision)];
 		
 		float widthincrement = width/widthdivision;
 		float heightincrement = height/heightdivision;
 		
-		float currwidth = 0;
-		float currheight = 0;
+		float currwidth = -(width / 2f);
+		float currheight = -(height / 2f);
 		int vertexindex = 0;
 		
-		for(int r=0; r<widthdivision+1; r++){
-			for(int c=0; c<heightdivision+1; c++){
+		for(int r=0; r<heightdivision+1; r++){
+			for(int c=0; c<widthdivision+1; c++){
 				v[vertexindex] = new Vertex(currwidth, currheight , 0, color);
 				vertexindex++;
 				currwidth += widthincrement;
 			}
 			currheight += heightincrement;
+			currwidth = -(width / 2f);
 		}
 		
+		int rectCount = heightdivision*widthdivision;
+		int t_index = 0;
+		int h_offset = 0;
+		for (int i = 0; i < rectCount; i++)
+		{
+			int i_o = i + h_offset;
+			t[t_index] = new Triangle3D(v[i_o], v[i_o + widthdivision + 1], v[i_o + 1]);
+			t[t_index + 1] = new Triangle3D(v[i_o + 1], v[i_o + widthdivision + 1], v[i_o + widthdivision + 2]);
+			t_index += 2;
+			if (i > 0 && (i + 1) % widthdivision == 0)
+			{
+				h_offset++;
+			}
+		}
 		
+		for(Triangle3D triangle : t){
+			for(Vertex curr : triangle.getVertices()){
+				Object.setVertexNormal(curr, t);
+			}
+		}
 		
+		return new Object(t);
 	}
-	*/
+	
 	public static Object object(File file, String HAND, Color color){
 		
 		ArrayList<Vertex> vertices = new ArrayList<Vertex>();
