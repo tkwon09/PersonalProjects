@@ -1,0 +1,142 @@
+#if !defined(HANDMADE_H)
+/* ------------------------------------------------
+   $File: handmade.h
+   $Date: 8/17/2015
+   $Creator: Casey Muratori
+   ------------------------------------------------ */
+/*
+  NOTE:
+  HANDMADE_INTERNAL: 0 - Build for public, 1 - Build for developer
+  HANDMADE_SLOW: 0 - No slow code allowed, 1 - Slow code allowed
+*/
+
+#include "handmade_platform.h"
+
+#define Pi32 3.14159265359f
+
+/*
+  Cross-platform design 1: Virtualize the operating system out to the game.
+
+  Abstract platform operations as virtual operating systems, but are implemented in platform-specific code. Use handles to structs that have different definitions based on the platform it's being compiled on.
+
+  Muratori doesn't like this approach because an OS needs a lot of flexibility but a game is much more specialized. So why should we virtualize a ton of OS functionality when it just adds complexity to our game?
+
+  Cross-platform design 2: Virtualize the game as services to the platform.
+
+  Write all the OS code as specific as it needs to be. Game gives OS graphics, sounds, user's input. OS sends network data for the game and handles file I/O. That's pretty much it. Prevents the platform layer from inheriting too much complexity from the OS. Reason this API design gives a lot of benefits is because there is large disparity between the flexibility between the services IN THIS CASE.
+
+  SUMMARY: Maintain a strict boundary between platform-specific code and platform-independent code.
+ */
+
+/*
+  STUDY: Semantic compression/Compression-oriented programming:
+  Don't assume API works and call it, build API from the ground up.
+  Write the usage code first, make sure it works, THEN elevate them into structures.
+  If you're stuck, pound out some code. Eventually it will inform you of what to do next.
+  Code is procedural by nature, complex object systems DO NOT CHANGE WHAT HAPPENS ON THE CPU.
+*/
+#if HANDMADE_SLOW // let's compiler know to build with assertions. Not for performance builds.
+#define Assert(Expression) if(!(Expression)) {*(int *) 0 = 0;} // Writes to the null pointer on failure...
+#else
+#define Assert(Expression)
+#endif
+
+#define Kilobytes(Value) ((Value) * 1024LL)
+#define Megabytes(Value) (Kilobytes(Value) * 1024LL)
+#define Gigabytes(Value) (Megabytes(Value) * 1024LL)
+#define Terabytes(Value) (Gigabytes(Value) * 1024LL)
+
+#define ArrayCount(Array) (sizeof(Array) / sizeof((Array)[0]))
+/*
+  TODO: swap, min, max... macros??
+ */
+
+inline uint32
+SafeTruncateUInt64(uint64 Value)
+{
+     // TODO: Defines for maximum values
+     Assert(Value <= 0xFFFFFFFF);
+     uint32 Result = (uint32) Value;
+     return Result;
+}
+
+inline game_controller_input*
+GetController(game_input *Input, int ControllerIndex)
+{
+     Assert(ControllerIndex < ArrayCount(Input->Controllers));
+     
+     game_controller_input *Result = &Input->Controllers[ControllerIndex];
+     return Result;
+}
+
+//
+//
+//
+
+struct memory_arena
+{
+     memory_index Size;
+     uint8 *Base;
+     memory_index Used;
+};
+
+internal void
+InitializeArena(memory_arena *Arena, memory_index Size, uint8 *Base)
+{
+     Arena->Size = Size;
+     Arena->Base = Base;
+     Arena->Used = 0;
+}
+
+// Macros so we can push any type we want >:D
+#define PushStruct(Arena, type) (type *) PushSize_(Arena, sizeof(type))
+#define PushArray(Arena, Count, type) (type *) PushSize_(Arena, (Count) * sizeof(type))
+void*
+PushSize_(memory_arena *Arena, memory_index Size)
+{
+     Assert((Arena->Used + Size) <= Arena->Size);
+     void *Result = Arena->Base + Arena->Used;
+     Arena->Used += Size;
+     return Result;
+}
+
+#include "handmade_intrinsics.h"
+#include "handmade_tile.h"
+
+struct world
+{
+     tile_map *TileMap;
+};
+
+struct loaded_bitmap
+{
+     int32 Width;
+     int32 Height;
+     uint32 *Pixels;
+};
+
+struct hero_bitmaps
+{
+     int32 AlignX;
+     int32 AlignY;
+     
+     loaded_bitmap Body;
+     loaded_bitmap InnerCoat;
+     loaded_bitmap OuterCoat;
+};
+
+struct game_state
+{
+     memory_arena WorldArena;
+     world *World;
+
+     tile_map_position CameraP;
+     tile_map_position PlayerP;
+
+     loaded_bitmap Backdrop;
+     uint32 HeroFacingDirection;
+     hero_bitmaps HeroBitmaps[4];
+};
+
+#define HANDMADE_H
+#endif

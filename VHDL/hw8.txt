@@ -1,0 +1,184 @@
+EECS 112L
+hw 8
+Theodore Won
+UCI: 96106784
+ACCESS UCI: 000757035
+
+All comments in source code are marked with ***.
+
+8.1
+
+Followed instructions to create a simple 2-phase version of the CPU. Since it didn't deviate very much from the previous implementation, I could understand the architecture easily and implementation went very smoothly. No test failures occurred.
+
+8.2
+
+I followed the instructions to assign control signals. The trickiest parts were figuring out the latch source signals and which signals the muxes were using to produce an output. My debugging process actually made the entire architecture very clear to me over time.
+
+The first simulation produced a large number of failures. multi was failing to write instructions to the right program memory locations. Closer inspection showed that first add instruction ran as expected and failure only began in the next.
+
+So, the location of the bug must have been in the nextPC calculation or the lines that write to program memory.
+
+Starting address as 40000000:
+prog[00000000] = 00000000, expecting 00642820.
+
+So it turns out PC never progressed to the next instruction. It remained at prog[00000000].
+
+The mistake was PCplus4 was not propagated from stage 1 phase 2 to stage 2 phase 1. This fix resolved the majority of failures.
+
+Next major bug occurred in line 464.
+R[19] = FFFFFFE0, expecting 7FFFFFF8.
+
+Lines 464-468, 508-517, 536-545, 709, 710, 738-743 produced register read errors.
+Lines 758-764 produced memory read errors.
+
+Since preliminary register and memory read/write operation tests passed,  it made sense to check the control signals responsible for the shift operations.
+
+Lines 464-468 test srl. Instructions sll, sra work correctly.
+Lines 508-517 test srl and sllv.
+Lines 536-545 test srlv and srav.
+Lines 709 and 710 test lui.
+Lines 738-743 test lw. All registers give 12345678, which is mem[00000000]
+Lines 758-764 test sw. Memory locations used outside of previous tests return 00000000.
+
+The mistake with the shift instructions was that Shctl was never latched during stage 2 phase 1. However this only fixed lines 464-468.
+
+Further investigation showed that muxSSel was also not being latched during stage 2 phase 1. Adding this fixed all shift instruction test failures.
+
+Checking stage 3 phase 1 showed that luiRes was being latched to itself instead of a stage 3 phase 1 signal. Fixing this also fixed the lui instruction test failures.
+
+Load and store instructions were failing because the addresses were not being calculated properly. Examining the control signals showed that DtoM was not being latched properly. Also, DMAddr should have been latched from sltRes because it is the post-processed output from the ALU.
+
+Implementing the above fixes resolved all failures.
+
+8.3
+
+Again, I followed instructions to produce a first attempt. Many of the issues I encountered came from missing a few signals. I added them in (marked with ***). Many of the bugs came from problems with muxSA and nextPC. Over the debugging process the entire architecture again became clear.
+
+50 tests failed starting with load instructions.
+
+Simple load tests
+line 824: R[10] = 18283848, expecting ABCDEF80
+line 825: R[11] = 4AA48BB8, expecting 18283848
+line 826: R[12] = 87654321, expecting 4AA48BB8
+line 827: R[13] = ABCDEF80, expecting 87654321
+line 828: R[14] = 4AA48BB8, expecting ABCDEF80
+line 829: R[15] = 12345678, expecting 4AA48BB8
+
+Simple store tests
+line 849: memData[70000000] = 12345678, expecting 4AA48BB8
+line 850: memData[70000004] = 4AA48BB8, expecting ABCDEF80
+line 851: memData[70000008] = ABCDEF80, expecting 87654321
+line 852: memData[7000000C] = 87654321, expecting 4AA48BB8
+line 853: memData[70000010] = 4AA48BB8, expecting 18283848
+line 854: memData[70000014] = 18283848, expecting ABCDEF80
+line 855: memData[70000018] = 12345678, expecting 4AA48BB8
+
+the first store test is:
+sw     15 0b 0000   # this should be 4aa48bb8
+
+The test failed. However R[15] contained 12345678 due to the failed lw tests. The “failure” here was consistent with the load test failure. Cross checks revealed that 12345678 was NOT the value originally loaded into memData[70000000]. All store tests exhibited this kind of result. Therefore, the store tests actually passed and the point of failure was in the load tests.
+
+Examining the load tests, all expected results were staggered by one load instruction. It seemed like the data to be read from memory and written back to the register file was the data from one stage ahead. This indicated that during write-back, DfrM was getting overwritten by the next lw instruction.
+
+A closer look showed that DfrM was not being latched during stage 4 phase 1. Latching DfrM to DfrM41 prevented the data from being overwritten. This fix resolved the load and store failures.
+
+The remaining 35 failures were less straightforward.
+
+line 871: muxPSel=00, prog[00000004] = 8D710004, expecting 8D700000
+line 872: muxPSel=00, prog[00000008] = 8D720008, expecting 8D710004
+line 873: muxPSel=00, prog[0000000C] = 8D73000C, expecting 8D720008
+line 874: muxPSel=00, prog[00000010] = 8D940004, expecting 8D73000C
+line 875: muxPSel=00, prog[00000014] = 8DB5FFFC, expecting 8D940004
+line 876: muxPSel=00, prog[00000018] = 20000000, expecting 8DB5FFFC
+
+line 889: muxPSel=00, prog[0000001C] = 20021234, expecting 08000002
+line 890: muxPSel=00, prog[00000020] = 20431111, expecting 20021234
+line 891: muxPSel=00, prog[00000024] = 03E00008, expecting 8D720008
+line 892: muxPSel=10, prog[00004567] = 00000000, expecting 0C000007
+line 893: muxPSel=00, prog[0000456B] = 00000000, expecting 8D940004
+line 894: muxPSel=00, prog[0000456F] = 00000000, expecting 20021234
+line 895: muxPSel=00, prog[00004573] = 00000000, expecting 20431111
+line 896: nextPC = 00004577, expecting 00000024
+
+line 898: R[1F] = 7FFFFFFF, expecting 00000010
+
+line 903: nextPC = 0000457B, expecting 00000028
+
+line 906: nextPC = 0000457B, expecting 00000028
+
+line 911: nextPC = 0000457F, expecting 00000010
+
+line 915: muxPSel=00, prog[0000457F] = 00000000, expecting 8D940004
+line 916: muxPSel=00, prog[00004583] = 00000000, expecting 00802809
+line 917: muxPSel=00, prog[00004587] = 00000000, expecting 281D0000
+line 918: muxPSel=00, prog[0000458B] = 00000000, expecting 8D940004
+
+line 948: muxPSel=11, prog[0000001C] = 20021234, expecting 20448345
+line 949: muxPSel=00, prog[00000020] = 20431111, expecting 20021234
+
+line 956: muxPSel=00, prog[00000024] = 0641FFFD, expecting 20431111
+line 957: muxPSel=11, prog[00000028] = 20448345, expecting 0641FFFD
+line 958: muxPSel=00, prog[0000002C] = 0691FFFB, expecting 20448345
+line 959: muxPSel=11, prog[00000030] = 30000000, expecting 0691FFFB
+line 960: muxPSel=00, prog[00000034] = 38000000, expecting 30000000
+line 961: muxPSel=00, prog[00000038] = 34000000, expecting 38000000
+line 962: muxPSel=00, prog[0000003C] = 20000000, expecting 34000000
+line 963: muxPSel=00, prog[00000040] = AD750018, expecting 20000000
+
+line 974: muxPSel=11, prog[0000001C] = 20021234, expecting 30000000
+
+line 976: muxPSel=00, prog[00000020] = 20431111, expecting 20021234
+line 977: muxPSel=00, prog[00000024] = 0641FFFD, expecting 20431111
+
+First I suspected that the branch signals were not propagating correctly. Adding branch and pcplusoffset signals for stage 2 phase 2 resolved some failures and  altered the test results somewhat.
+
+32 failures:
+
+line 871: muxPSel=00, prog[00000004] = 8D710004, expecting 8D700000
+line 872: muxPSel=00, prog[00000008] = 8D720008, expecting 8D710004
+line 873: muxPSel=00, prog[0000000C] = 8D73000C, expecting 8D720008
+line 874: muxPSel=00, prog[00000010] = 8D940004, expecting 8D73000C
+line 875: muxPSel=00, prog[00000014] = 8DB5FFFC, expecting 8D940004
+line 876: muxPSel=00, prog[00000018] = 20000000, expecting 8DB5FFFC
+
+line 889: muxPSel=00, prog[0000001C] = 20021234, expecting 08000002
+line 890: muxPSel=00, prog[00000020] = 20431111, expecting 20021234
+line 891: muxPSel=00, prog[00000024] = 03E00008, expecting 8D720008
+line 892: muxPSel=10, prog[00004567] = 00000000, expecting 0C000007
+line 893: muxPSel=00, prog[0000456B] = 00000000, expecting 8D940004
+line 894: muxPSel=00, prog[0000456F] = 00000000, expecting 20021234
+line 895: muxPSel=00, prog[00004573] = 00000000, expecting 20431111
+line 896: nextPC = 00004577, expecting 00000024
+
+line 898: R[1F] = 7FFFFFFF, expecting 00000010
+
+line 903: nextPC = 0000457B, expecting 00000028
+
+line 906: nextPC = 0000457B, expecting 00000028
+
+line 911: nextPC = 0000457F, expecting 00000010
+
+line 915: muxPSel=00, prog[0000457F] = 00000000, expecting 8D940004
+line 916: muxPSel=00, prog[00004583] = 00000000, expecting 00802809
+line 917: muxPSel=00, prog[00004587] = 00000000, expecting 281D0000
+line 918: muxPSel=00, prog[0000458B] = 00000000, expecting 8D940004
+
+line 949: muxPSel=00, prog[0000002C] = 0691FFFB, expecting 20021234
+
+line 956: muxPSel=11, prog[00000030] = 30000000, expecting 20431111
+line 957: muxPSel=00, prog[00000034] = 38000000, expecting 0641FFFD
+line 958: muxPSel=00, prog[00000038] = 34000000, expecting 20448345
+line 959: muxPSel=00, prog[0000003C] = 20000000, expecting 0691FFFB
+line 960: muxPSel=00, prog[00000040] = AD750018, expecting 30000000
+line 961: muxPSel=00, prog[00000044] = 34000000, expecting 38000000
+
+line 963: muxPSel=00, prog[0000004C] = 34000000, expecting 20000000
+
+line 976: muxPSel=00, prog[00000034] = 38000000, expecting 20021234
+line 977: muxPSel=00, prog[00000038] = 34000000, expecting 20431111
+
+The remaining failures seemed to be related to another signal not propagating correctly. The results seemed to be off by one phase as before. Looking closely at muxP, it turns out the result was not using inputs from the correct stage and phase.
+
+Modifying the erroneous input to stage 2 phase 2 resolved all remaining failures.
+
+Most bugs were a result of not understanding the intent behind certain signal assignments and propagation. The final part was especially demanding since I needed to both understand the architecture and also think a bit outside the explicit instructions to add what the architecture required to function properly.
